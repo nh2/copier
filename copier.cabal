@@ -1,0 +1,41 @@
+name:                copier
+version:             0.1.0.0
+synopsis:            Copies files in parallel for use on networked file systems
+homepage:            https://github.com/nh2/copier#readme
+license:             MIT
+author:              Niklas Hambüchen <mail@nh2.me>
+maintainer:          Niklas Hambüchen <mail@nh2.me>
+copyright:           2017 Niklas Hambüchen
+category:            Application
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Copier
+  build-depends:       base >= 4.7 && < 5
+                     , posix-paths
+  ghc-options:         -Wall
+  default-language:    Haskell2010
+
+executable copier
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , copier
+  default-language:    Haskell2010
+
+test-suite copier-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Main.hs
+  build-depends:       base
+                     , copier
+  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/nh2/copier

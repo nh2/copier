@@ -1,0 +1,5 @@
+resolver: nightly-2017-01-25
+packages:
+- '.'
+extra-deps:
+- posix-paths-0.2.1.0
