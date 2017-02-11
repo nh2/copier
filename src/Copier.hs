@@ -25,6 +25,7 @@ import           System.Posix.Directory.ByteString (createDirectory, removeDirec
 import           System.Posix.Types (FileMode)
 
 import           PooledMapConcurrently (pooledMapConcurrently')
+import           Sendfile (copyFileSendfile)
 
 
 -- | Command line arguments of this program.
@@ -128,8 +129,8 @@ main = do
               _ <- removeIfExists dest
               createSymbolicLink linkPointerTarget dest
           | isRegularFile sourceStatus -> do
-              -- TODO: Don't use `String`, and use `sendfile()` instead
-              copyFile (T.unpack $ decodeUtf8OrDie sourcePath) (T.unpack $ decodeUtf8OrDie dest)
+              let toFileCreateMode = fileMode sourceStatus
+              copyFileSendfile sourcePath (Just sourceStatus) dest toFileCreateMode
           | otherwise -> do
               die $ "Can only copy regular files, symlinks and directories, but this isn't one: " ++ T.unpack (decodeUtf8OrDie sourcePath)
 

@@ -15,6 +15,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     Copier
                        PooledMapConcurrently
+                       Sendfile
   build-depends:       base >= 4.7 && < 5
                      , bytestring
                      , directory
