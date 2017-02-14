@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Copier
   ( main
@@ -8,15 +9,19 @@ module Copier
 import           Control.Monad (when)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import           Data.Either (partitionEithers)
+import           Data.Foldable (for_)
 import           Data.Monoid ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           Data.Traversable (for)
 import           GHC.Stack (HasCallStack)
 import           Options.Applicative (Parser, argument, str, option, auto, value, help, metavar, long, short)
 import qualified Options.Applicative as Opts
 import           System.Directory (copyFile, removeDirectoryRecursive)
 import           System.Exit (die)
+import qualified System.FilePath as FP
 import           System.IO.Error (catchIOError)
 import           System.Posix.Directory.Traversals (allDirectoryContents')
 import           System.Posix.FilePath (RawFilePath, (</>), takeFileName)
@@ -85,19 +90,29 @@ mkdirIfMissing :: RawFilePath -> FileMode -> IO ()
 mkdirIfMissing dir mode = do
   exists <- fileExist dir
   _ <- removeIfExists dir
+  putStrLn $ "creating dir " ++ show dir
   createDirectory dir mode
+
+
+-- Missing from posix-paths
+normaliseRawFilePath :: RawFilePath -> RawFilePath
+normaliseRawFilePath = T.encodeUtf8 . T.pack . FP.normalise . T.unpack . decodeUtf8OrDie
 
 
 main :: IO ()
 main = do
   CLIArgs
-    { sourceDir
-    , destDir
+    { sourceDir = sourceDirUnNormalised
+    , destDir = destDirUnNormalised
     , numJobs
     } <- parseArgs
 
   -- Arguments validation.
   when (numJobs < 1) $ die $ "--jobs must be positive; was: " ++ show numJobs
+
+  -- These are now guaranteed to have trailing slashes at the end.
+  let sourceDir = normaliseRawFilePath (sourceDirUnNormalised <> "/")
+  let destDir = normaliseRawFilePath (destDirUnNormalised <> "/")
 
   pathsWithSourceDir <- allDirectoryContents' sourceDir
   case pathsWithSourceDir of
@@ -110,28 +125,34 @@ main = do
       destDirExists <- fileExist destDir
       when (not destDirExists) $ die $ "Target directory " ++ T.unpack (decodeUtf8OrDie destDir) ++ " does not exist"
 
-      let prefixLength = BS.length sourceDir + 1
+      let prefixLength = BS.length sourceDir
 
-      _ <- flip (pooledMapConcurrently' numJobs) sourcePaths $ \sourcePath -> do
+      let copyCreate sourcePath = do
 
-        let pathInsideSourceDir = BS.drop prefixLength sourcePath
-        let dest = destDir </> pathInsideSourceDir
+            let pathInsideSourceDir = BS.drop prefixLength sourcePath
+            let dest = destDir </> pathInsideSourceDir
 
-        sourceStatus <- getSymbolicLinkStatus sourcePath
-        if
-          | isDirectory sourceStatus -> do
-              mkdirIfMissing dest (fileMode sourceStatus) -- preserve dir perms
-          | isSymbolicLink sourceStatus -> do
-              linkPointerTarget <- readSymbolicLink sourcePath
-              -- TODO: Now this is not pretty with the `catchIOError` to decide
-              -- if the symlink dosn't exist, but that's how `doesFileExist`
-              -- does it. Switch this to a proper `lstat()` ENOENT handling later.
-              _ <- removeIfExists dest
-              createSymbolicLink linkPointerTarget dest
-          | isRegularFile sourceStatus -> do
-              let toFileCreateMode = fileMode sourceStatus
-              copyFileSendfile sourcePath (Just sourceStatus) dest toFileCreateMode
-          | otherwise -> do
-              die $ "Can only copy regular files, symlinks and directories, but this isn't one: " ++ T.unpack (decodeUtf8OrDie sourcePath)
+            sourceStatus <- getSymbolicLinkStatus sourcePath
+            if
+              | isDirectory sourceStatus -> do
+                  mkdirIfMissing dest (fileMode sourceStatus) -- preserve dir perms
+              | isSymbolicLink sourceStatus -> do
+                  linkPointerTarget <- readSymbolicLink sourcePath
+                  -- TODO: Now this is not pretty with the `catchIOError` to decide
+                  -- if the symlink dosn't exist, but that's how `doesFileExist`
+                  -- does it. Switch this to a proper `lstat()` ENOENT handling later.
+                  _ <- removeIfExists dest
+                  createSymbolicLink linkPointerTarget dest
+              | isRegularFile sourceStatus -> do
+                  let toFileCreateMode = fileMode sourceStatus
+                  copyFileSendfile sourcePath (Just sourceStatus) dest toFileCreateMode
+              | otherwise -> do
+                  die $ "Can only copy regular files, symlinks and directories, but this isn't one: " ++ T.unpack (decodeUtf8OrDie sourcePath)
 
+      (dirs, files) <- (partitionEithers <$>) $ for sourcePaths $ \sourcePath -> do
+        stat <- getSymbolicLinkStatus sourcePath
+        pure $ if isDirectory stat then Left sourcePath else Right sourcePath
+
+      for_ dirs copyCreate
+      _ <- pooledMapConcurrently' numJobs copyCreate files
       return ()
