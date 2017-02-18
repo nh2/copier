@@ -6,4 +6,4 @@
 
 ## Building
 
-`stack build`. Then `stack exec -- which copier` shows you the path to the built binary.
+[`stack build`](https://haskellstack.org). Then `stack exec -- which copier` shows you the path to the built binary.
