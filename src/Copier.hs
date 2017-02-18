@@ -27,10 +27,11 @@ import qualified System.FilePath as FP
 import           System.IO.Error (catchIOError)
 import           System.Posix.Directory.Traversals (allDirectoryContents')
 import           System.Posix.FilePath (RawFilePath, (</>))
-import           System.Posix.Files.ByteString (isDirectory, isRegularFile, isSymbolicLink, fileMode, fileExist, createSymbolicLink, readSymbolicLink, removeLink, modificationTimeHiRes, accessTimeHiRes, fileSize, setFileTimesHiRes)
+import           System.Posix.Files.ByteString (isDirectory, isRegularFile, isSymbolicLink, fileMode, fileExist, createSymbolicLink, readSymbolicLink, removeLink, modificationTimeHiRes, accessTimeHiRes, fileSize)
 import           System.Posix.Directory.ByteString (createDirectory)
 import           System.Posix.Types (FileMode)
 
+import           InterruptibleUtimensat (setFileTimesHiResNonBlocking)
 import           PooledMapConcurrently (pooledMapConcurrently')
 import           Sendfile (copyFileSendfile)
 import           SafeFFIStat (getSymbolicLinkStatusNonBlocking)
@@ -200,13 +201,7 @@ main = do
 
                       when mtimesDisagree $ do
                         when verbose $ putStrLn $ "  Setting times " ++ T.unpack (decodeUtf8OrDie sourcePath)
-                        -- TODO fix unix package to handle EINTR in futimens();
-                        --      Ubuntu's `man futimens` doesn't document that EINTR can happen
-                        --      but some man pages on the internet suggest it can and I found
-                        --      it to occur as my Ctrl-Z on this program resulted in
-                        --        setFileTimesHiRes: interrupted (Interrupted system call)
-                        --      see https://github.com/haskell/unix/issues/86
-                        setFileTimesHiRes dest destAtime sourceMtime
+                        setFileTimesHiResNonBlocking dest destAtime sourceMtime
 
               | otherwise -> do
                   die $ "Can only copy regular files, symlinks and directories, but this isn't one: " ++ T.unpack (decodeUtf8OrDie sourcePath)
