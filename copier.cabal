@@ -16,6 +16,7 @@ library
   exposed-modules:     Copier
                        PooledMapConcurrently
                        Sendfile
+                       SafeFFIStat
   build-depends:       base >= 4.7 && < 5
                      , bytestring
                      , directory
@@ -27,6 +28,7 @@ library
                      , optparse-applicative
                      , posix-paths
                      , text
+                     , time
                      , unix
   ghc-options:         -Wall
   default-language:    Haskell2010
@@ -34,7 +36,7 @@ library
 executable copier
   hs-source-dirs:      app
   main-is:             Main.hs
-  ghc-options:         -Wall
+  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N1
   build-depends:       base
                      , copier
   default-language:    Haskell2010
@@ -43,7 +45,7 @@ test-suite copier-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Main.hs
-  ghc-options:         -Wall
+  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N1
   build-depends:       base
                      , copier
   default-language:    Haskell2010
