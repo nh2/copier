@@ -21,13 +21,13 @@ import           Data.Traversable (for)
 import           GHC.Stack (HasCallStack)
 import           Options.Applicative (Parser, argument, str, option, auto, value, help, metavar, long, short)
 import qualified Options.Applicative as Opts
-import           System.Directory (removeDirectoryRecursive)
+import           System.Directory (doesDirectoryExist, removeDirectoryRecursive)
 import           System.Exit (die)
 import qualified System.FilePath as FP
 import           System.IO.Error (catchIOError)
 import           System.Posix.Directory.Traversals (allDirectoryContents')
 import           System.Posix.FilePath (RawFilePath, (</>))
-import           System.Posix.Files.ByteString (isDirectory, isRegularFile, isSymbolicLink, fileMode, fileExist, createSymbolicLink, readSymbolicLink, removeLink, modificationTimeHiRes, accessTimeHiRes, fileSize)
+import           System.Posix.Files.ByteString (isDirectory, isRegularFile, isSymbolicLink, fileMode, fileExist, createSymbolicLink, readSymbolicLink, removeLink, modificationTimeHiRes, accessTimeHiRes, fileSize, setFileMode)
 import           System.Posix.Directory.ByteString (createDirectory)
 import           System.Posix.Types (FileMode)
 
@@ -109,9 +109,16 @@ removeIfExists path = do
 -- | Creates a directory with given permissions, if it doesn't exist.
 mkdirIfMissing :: RawFilePath -> FileMode -> IO ()
 mkdirIfMissing dir mode = do
-  _ <- removeIfExists dir
-  putStrLn $ "creating dir " ++ show dir
-  createDirectory dir mode
+  exists <- doesDirectoryExist (T.unpack $ decodeUtf8OrDie dir)
+  if exists
+    then do
+      existingMode <- fileMode <$> getSymbolicLinkStatusNonBlocking dir
+      when (existingMode /= mode) $ do
+        putStrLn $ "setting dir mode to " ++ show mode ++ " for " ++ show dir
+        setFileMode dir mode
+    else do
+      putStrLn $ "creating dir " ++ show dir
+      createDirectory dir mode
 
 
 -- Missing from posix-paths
