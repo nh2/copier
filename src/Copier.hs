@@ -166,6 +166,7 @@ main = do
             if
               | isDirectory sourceStatus -> do
                   mkdirIfMissing dest (fileMode sourceStatus) -- preserve dir perms
+                  -- TODO also copy mtimes for directories
               | isSymbolicLink sourceStatus -> do
                   linkPointerTarget <- readSymbolicLink sourcePath
                   _ <- removeIfExists dest
