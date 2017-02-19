@@ -13,7 +13,7 @@ module SafeFileFFI
 
 import           Data.Bits ((.|.))
 import           Foreign (Ptr, withForeignPtr, mallocForeignPtrBytes)
-import           Foreign.C.Error (throwErrnoIfMinus1_)
+import           Foreign.C.Error (throwErrnoIfMinus1Retry_)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
 import           System.Posix.ByteString.FilePath (RawFilePath, withFilePath, throwErrnoPathIfMinus1_, throwErrnoPathIfMinus1Retry_)
@@ -42,6 +42,8 @@ open_  :: CString
        -> IO Fd
 open_ str how maybe_mode (OpenFileFlags appendFlag exclusiveFlag nocttyFlag
                                 nonBlockFlag truncateFlag) = do
+    -- Note: We don't check for EINTR here; the higher-level
+    -- `openFd` does it.
     fd <- c_open_safe str all_flags mode_w
     return (Fd fd)
   where
@@ -67,7 +69,7 @@ open_ str how maybe_mode (OpenFileFlags appendFlag exclusiveFlag nocttyFlag
 -- invalid descriptor.
 
 closeFdNonBlocking :: Fd -> IO ()
-closeFdNonBlocking (Fd fd) = throwErrnoIfMinus1_ "closeFdNonBlocking" (c_close_safe fd)
+closeFdNonBlocking (Fd fd) = throwErrnoIfMinus1Retry_ "closeFdNonBlocking" (c_close_safe fd)
 
 foreign import ccall safe "close"
   c_close_safe :: CInt -> IO CInt
