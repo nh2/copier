@@ -34,7 +34,7 @@ import           System.Posix.Types (FileMode)
 import           InterruptibleUtimensat (setFileTimesHiResNonBlocking)
 import           PooledMapConcurrently (pooledMapConcurrently')
 import           Sendfile (copyFileSendfile)
-import           SafeFFIStat (getSymbolicLinkStatusNonBlocking)
+import           SafeFileFFI (getSymbolicLinkStatusNonBlocking)
 
 
 -- | Command line arguments of this program.

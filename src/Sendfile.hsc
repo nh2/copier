@@ -15,6 +15,8 @@ import           System.Posix.IO.ByteString
 import           System.Posix.ByteString.FilePath
 import           System.Posix.Types
 
+import           SafeFileFFI (openFdNonBlocking, closeFdNonBlocking)
+
 #define _LARGEFILE64_SOURCE 1
 #include <sys/types.h>
 #include <stdio.h>
@@ -26,10 +28,11 @@ foreign import ccall unsafe "sendfile64" c_sendfile64
     :: Fd -> Fd -> Ptr (#type off64_t) -> (#type size_t) -> IO (#type ssize_t)
 
 
--- | See `openFd`.
+-- | See `openFd`; the actual implementation uses
+-- `openFdNonBlocking` and `closeFdNonBlocking`.
 withFileAsFd :: RawFilePath -> OpenMode -> Maybe FileMode -> OpenFileFlags -> (Fd -> IO r) -> IO r
 withFileAsFd name mode createMode flags =
-  bracket (openFd name mode createMode flags) closeFd
+  bracket (openFdNonBlocking name mode createMode flags) closeFdNonBlocking
 
 
 -- | Copies a file using the `sendfile()` system call.
